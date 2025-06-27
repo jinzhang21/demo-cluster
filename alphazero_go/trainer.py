@@ -19,7 +19,9 @@ class Trainer:
         self.board_size = board_size
         self.model = PolicyValueNet(board_size)
         self.buffer = ReplayBuffer(buffer_size)
-        self.mcts = MCTS(self.model, num_simulations=30, verbose=verbose)
+        # Reduce MCTS simulations significantly for small boards
+        num_sims = max(5, min(20, board_size * board_size // 2))
+        self.mcts = MCTS(self.model, num_simulations=num_sims, verbose=verbose)
         self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
         self.verbose = verbose
         self.show_heatmaps = show_heatmaps

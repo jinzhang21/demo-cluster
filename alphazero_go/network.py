@@ -7,10 +7,12 @@ class PolicyValueNet(nn.Module):
     def __init__(self, board_size: int = 5):
         super().__init__()
         self.board_size = board_size
-        self.conv1 = nn.Conv2d(2, 64, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
-        self.policy_head = nn.Linear(64 * board_size * board_size, board_size * board_size)
-        self.value_head = nn.Linear(64 * board_size * board_size, 1)
+        # Reduce network size for faster inference on small boards
+        hidden_size = min(64, max(16, board_size * board_size * 2))
+        self.conv1 = nn.Conv2d(2, hidden_size, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1)
+        self.policy_head = nn.Linear(hidden_size * board_size * board_size, board_size * board_size)
+        self.value_head = nn.Linear(hidden_size * board_size * board_size, 1)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))

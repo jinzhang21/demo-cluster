@@ -62,7 +62,7 @@ class MCTS:
 
         for _ in range(self.num_simulations):
             node = root
-            scratch_board = board.copy()
+            scratch_board = board.fast_copy()
             search_path = [node]
             # select
             while node.is_expanded and node.children:

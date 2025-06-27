@@ -16,6 +16,15 @@ class GoBoard:
         new.current_player = self.current_player
         new.passes = self.passes
         return new
+    
+    def fast_copy(self) -> 'GoBoard':
+        """Faster copy for MCTS simulations - reuses object."""
+        new = object.__new__(GoBoard)
+        new.size = self.size
+        new.board = self.board.copy()
+        new.current_player = self.current_player
+        new.passes = self.passes
+        return new
 
     def in_bounds(self, x: int, y: int) -> bool:
         return 0 <= x < self.size and 0 <= y < self.size

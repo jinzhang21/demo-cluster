@@ -15,8 +15,21 @@ except ImportError:
 
 def train(args):
     show_heatmaps = getattr(args, 'heatmaps', False) or getattr(args, 'verbose', False)
+    
+    # Apply fast training optimizations
+    if getattr(args, 'fast', False):
+        # Reduce iterations and games for faster training
+        iters = max(3, args.iters // 2)
+        games = max(1, args.games)
+        batch_size = min(16, args.batch)
+        print(f"Fast mode: Using {iters} iterations, {games} games/iter, batch size {batch_size}")
+    else:
+        iters = args.iters
+        games = args.games
+        batch_size = args.batch
+    
     trainer = Trainer(board_size=args.size, verbose=args.verbose, show_heatmaps=show_heatmaps)
-    trainer.train(iterations=args.iters, games_per_iter=args.games, batch_size=args.batch)
+    trainer.train(iterations=iters, games_per_iter=games, batch_size=batch_size)
     torch.save(trainer.model.state_dict(), args.model)
 
 
@@ -73,6 +86,7 @@ def main():
     t.add_argument('--model', type=str, default='model.pt')
     t.add_argument('--verbose', action='store_true', help='Show detailed training progress')
     t.add_argument('--heatmaps', action='store_true', help='Show MCTS probability heatmaps during training')
+    t.add_argument('--fast', action='store_true', help='Fast training mode with optimized settings')
 
     p = subparsers.add_parser('play')
     p.add_argument('--size', type=int, default=5)
