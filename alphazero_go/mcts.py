@@ -2,8 +2,12 @@ import math
 import numpy as np
 from typing import Dict, Optional, Tuple
 
-from .board import GoBoard
-from .network import PolicyValueNet
+try:
+    from .board import GoBoard
+    from .network import PolicyValueNet
+except ImportError:
+    from board import GoBoard
+    from network import PolicyValueNet
 
 class Node:
     def __init__(self, prior: float):
@@ -39,10 +43,11 @@ class Node:
         return best_move, best_child
 
 class MCTS:
-    def __init__(self, model: PolicyValueNet, num_simulations: int = 50, c_puct: float = 1.0):
+    def __init__(self, model: PolicyValueNet, num_simulations: int = 50, c_puct: float = 1.0, verbose: bool = False):
         self.model = model
         self.num_simulations = num_simulations
         self.c_puct = c_puct
+        self.verbose = verbose
 
     def run(self, board: GoBoard) -> np.ndarray:
         root = Node(0)
@@ -90,4 +95,36 @@ class MCTS:
             visits[idx] = child.visit_count
         if np.sum(visits) > 0:
             visits /= np.sum(visits)
+        
+        if self.verbose:
+            self._print_search_stats(root, board)
+        
         return visits.reshape(board.size, board.size)
+    
+    def _print_search_stats(self, root: Node, board: GoBoard):
+        print(f"MCTS Search Statistics (after {self.num_simulations} simulations):")
+        print(f"Root visits: {root.visit_count}, Root value: {root.value():.3f}")
+        
+        # Sort moves by visit count
+        sorted_moves = sorted(root.children.items(), key=lambda x: x[1].visit_count, reverse=True)
+        
+        print("Top moves:")
+        for i, (move, child) in enumerate(sorted_moves[:5]):
+            x, y = move
+            print(f"  {i+1}. ({x},{y}): visits={child.visit_count:3d}, value={child.value():+.3f}, prior={child.prior:.3f}")
+        
+        # Show visit count heatmap
+        print("\nVisit count heatmap:")
+        visit_grid = np.zeros((board.size, board.size), dtype=int)
+        for move, child in root.children.items():
+            visit_grid[move[0], move[1]] = child.visit_count
+        
+        for y in range(board.size):
+            row = []
+            for x in range(board.size):
+                if visit_grid[x, y] > 0:
+                    row.append(f"{visit_grid[x, y]:3d}")
+                else:
+                    row.append("  .")
+            print("  " + " ".join(row))
+        print()
