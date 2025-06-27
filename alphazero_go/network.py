@@ -7,16 +7,25 @@ class PolicyValueNet(nn.Module):
     def __init__(self, board_size: int = 5):
         super().__init__()
         self.board_size = board_size
-        # Reduce network size for faster inference on small boards
-        hidden_size = min(64, max(16, board_size * board_size * 2))
-        self.conv1 = nn.Conv2d(2, hidden_size, kernel_size=3, padding=1)
-        self.conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1)
+        # Minimal network for very small boards
+        if board_size <= 4:
+            # Ultra-light network for tiny boards
+            hidden_size = 8
+            self.conv1 = nn.Conv2d(2, hidden_size, kernel_size=1)  # 1x1 conv
+            self.conv2 = None  # Skip second conv
+        else:
+            hidden_size = min(32, max(16, board_size * board_size))
+            self.conv1 = nn.Conv2d(2, hidden_size, kernel_size=3, padding=1)
+            self.conv2 = nn.Conv2d(hidden_size, hidden_size, kernel_size=3, padding=1)
+        
+        self.hidden_size = hidden_size
         self.policy_head = nn.Linear(hidden_size * board_size * board_size, board_size * board_size)
         self.value_head = nn.Linear(hidden_size * board_size * board_size, 1)
 
     def forward(self, x):
         x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
+        if self.conv2 is not None:
+            x = F.relu(self.conv2(x))
         x = x.view(x.size(0), -1)
         policy = self.policy_head(x)
         value = torch.tanh(self.value_head(x))

@@ -19,8 +19,17 @@ class Trainer:
         self.board_size = board_size
         self.model = PolicyValueNet(board_size)
         self.buffer = ReplayBuffer(buffer_size)
-        # Reduce MCTS simulations significantly for small boards
-        num_sims = max(5, min(20, board_size * board_size // 2))
+        # Aggressive MCTS reduction for tiny boards
+        if board_size <= 3:
+            num_sims = 3  # Minimal simulations for 3x3
+        elif board_size <= 4:
+            num_sims = 5  # Very few for 4x4
+        else:
+            num_sims = max(5, min(15, board_size * board_size // 3))
+        
+        if verbose:
+            print(f"Using {num_sims} MCTS simulations for {board_size}x{board_size} board")
+        
         self.mcts = MCTS(self.model, num_simulations=num_sims, verbose=verbose)
         self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
         self.verbose = verbose
@@ -52,7 +61,7 @@ class Trainer:
                 if not legal_moves:
                     board.make_move(None)
                     if self.verbose:
-                        print("Pass move")
+                        print("Pass move (no legal moves)")
                     continue
                 probs_list = [move_probs[m[0] * board.size + m[1]] for m in legal_moves]
                 probs_list = np.array(probs_list)

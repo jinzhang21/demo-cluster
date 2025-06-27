@@ -9,12 +9,18 @@ class GoBoard:
         self.board = np.zeros((size, size), dtype=int)
         self.current_player = 1
         self.passes = 0
+        self.move_count = 0
+        self.max_moves = size * size * 4  # Safety limit: 4 moves per board position
+        self.board_history = []  # For Ko rule detection
 
     def copy(self) -> 'GoBoard':
         new = GoBoard(self.size)
         new.board = self.board.copy()
         new.current_player = self.current_player
         new.passes = self.passes
+        new.move_count = self.move_count
+        new.max_moves = self.max_moves
+        new.board_history = self.board_history.copy()
         return new
     
     def fast_copy(self) -> 'GoBoard':
@@ -24,6 +30,9 @@ class GoBoard:
         new.board = self.board.copy()
         new.current_player = self.current_player
         new.passes = self.passes
+        new.move_count = self.move_count
+        new.max_moves = self.max_moves
+        new.board_history = []  # Skip history for MCTS performance
         return new
 
     def in_bounds(self, x: int, y: int) -> bool:
@@ -76,28 +85,74 @@ class GoBoard:
 
     def make_move(self, move: Tuple[int,int], check_only: bool=False) -> bool:
         if move is None:
-            self.passes += 1
-            self.current_player *= -1
+            # Pass move
+            if not check_only:
+                self.passes += 1
+                self.current_player *= -1
+                self.move_count += 1
             return True
+        
         x, y = move
         if not self.in_bounds(x, y) or self.board[x, y] != 0:
             return False
+        
+        # Save current board state for Ko rule check
+        if not check_only and len(self.board_history) > 0:
+            board_state = self.board.tobytes()
+            if board_state in self.board_history[-3:]:  # Check last 3 states for Ko
+                return False  # Ko rule violation
+        
+        old_board = self.board.copy()
         self.board[x, y] = self.current_player
+        
         # capture opponent stones
         self._remove_dead_stones(-self.current_player)
+        
         # suicide check
         group, liberties = self._get_group(x, y)
         if liberties == 0:
-            # illegal move
-            self.board[x, y] = 0
+            # illegal move - restore board
+            self.board = old_board
             return False
+        
         if not check_only:
+            # Move is legal - update game state
+            self.board_history.append(old_board.tobytes())
+            if len(self.board_history) > 6:  # Keep only recent history
+                self.board_history.pop(0)
+            
             self.current_player *= -1
-            self.passes = 0
+            self.passes = 0  # Reset passes only after successful move
+            self.move_count += 1
+        
         return True
 
     def is_game_over(self) -> bool:
-        return self.passes >= 2
+        # Game ends if:
+        # 1. Both players pass consecutively
+        # 2. Board is full
+        # 3. Move limit reached (safety fallback)
+        # 4. No legal moves available for current player
+        
+        if self.passes >= 2:
+            return True
+        
+        if self.move_count >= self.max_moves:
+            return True
+        
+        # Check if board is full
+        empty_positions = np.sum(self.board == 0)
+        if empty_positions == 0:
+            return True
+        
+        # Check if current player has any legal moves
+        legal_moves = self.get_legal_moves()
+        if not legal_moves:
+            # If no legal moves, auto-pass and check if game should end
+            if self.passes >= 1:  # Previous player also had no moves
+                return True
+        
+        return False
 
     def result(self) -> int:
         """Return the winner: 1 if black wins, -1 if white wins, 0 for tie."""
