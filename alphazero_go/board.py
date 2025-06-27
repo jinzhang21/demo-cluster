@@ -10,7 +10,7 @@ class GoBoard:
         self.current_player = 1
         self.passes = 0
         self.move_count = 0
-        self.max_moves = size * size * 4  # Safety limit: 4 moves per board position
+        self.max_moves = size * size * 2  # Safety limit: 2 moves per board position (much more aggressive)
         self.board_history = []  # For Ko rule detection
 
     def copy(self) -> 'GoBoard':
@@ -96,10 +96,10 @@ class GoBoard:
         if not self.in_bounds(x, y) or self.board[x, y] != 0:
             return False
         
-        # Save current board state for Ko rule check
+        # Simplified Ko rule check - just check immediate repetition
         if not check_only and len(self.board_history) > 0:
             board_state = self.board.tobytes()
-            if board_state in self.board_history[-3:]:  # Check last 3 states for Ko
+            if board_state == self.board_history[-1]:  # Immediate repetition
                 return False  # Ko rule violation
         
         old_board = self.board.copy()
@@ -118,7 +118,7 @@ class GoBoard:
         if not check_only:
             # Move is legal - update game state
             self.board_history.append(old_board.tobytes())
-            if len(self.board_history) > 6:  # Keep only recent history
+            if len(self.board_history) > 2:  # Keep only 2 recent states
                 self.board_history.pop(0)
             
             self.current_player *= -1
@@ -132,7 +132,7 @@ class GoBoard:
         # 1. Both players pass consecutively
         # 2. Board is full
         # 3. Move limit reached (safety fallback)
-        # 4. No legal moves available for current player
+        # 4. No legal moves available
         
         if self.passes >= 2:
             return True
@@ -145,12 +145,9 @@ class GoBoard:
         if empty_positions == 0:
             return True
         
-        # Check if current player has any legal moves
-        legal_moves = self.get_legal_moves()
-        if not legal_moves:
-            # If no legal moves, auto-pass and check if game should end
-            if self.passes >= 1:  # Previous player also had no moves
-                return True
+        # For small boards, end early if most spaces are filled
+        if self.size <= 4 and empty_positions <= 2:
+            return True
         
         return False
 
